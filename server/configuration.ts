@@ -1,53 +1,17 @@
 import { z } from 'zod';
 import Ajv, { type ValidateFunction } from 'ajv';
 import addFormats from 'ajv-formats';
+import { property, schemaSpec, type Property, type TargetSchema } from './schema.js';
+import { normalizeSchemaInput } from './schemaInput.js';
 import type { Row } from './types.js';
 
+export type { Property, TargetSchema };
+
 /**
- * A migration's contract: the target JSON Schema (a documented flat subset),
- * the field that identifies a record, and where records are delivered.
- * Everything downstream (mapping, cleanup, validation, delivery) is driven by this.
+ * A migration's contract: the target schema, the field that identifies a record, and
+ * where records are delivered. Everything downstream (mapping, cleanup, validation,
+ * delivery) is driven by this.
  */
-const property = z
-  .object({
-    type: z.enum(['string', 'number', 'integer', 'boolean']),
-    title: z.string().max(200).optional(),
-    description: z.string().max(1000).optional(),
-    format: z.enum(['email', 'date']).optional(),
-    enum: z
-      .array(z.union([z.string(), z.number(), z.boolean()]))
-      .min(1)
-      .max(100)
-      .optional(),
-    pattern: z.string().max(300).optional(),
-    minLength: z.number().int().nonnegative().optional(),
-    maxLength: z.number().int().max(2000).optional(),
-    minimum: z.number().optional(),
-    maximum: z.number().optional(),
-    /** Confirmed source-column synonyms; matched before any AI is consulted. */
-    'x-aliases': z.array(z.string().max(120)).max(50).optional(),
-    /** Source value → canonical enum value, applied during safe cleanup. */
-    'x-value-aliases': z.record(z.string(), z.string()).optional(),
-    /** Values must be unique across records (in addition to the identity field). */
-    'x-unique': z.boolean().optional(),
-  })
-  .strict();
-export type Property = z.infer<typeof property>;
-
-const schemaSpec = z
-  .object({
-    $schema: z.string().optional(),
-    $id: z.string().optional(),
-    title: z.string().max(200).optional(),
-    description: z.string().max(2000).optional(),
-    type: z.literal('object'),
-    additionalProperties: z.literal(false),
-    required: z.array(z.string()),
-    properties: z.record(z.string(), property),
-  })
-  .strict();
-export type TargetSchema = z.infer<typeof schemaSpec>;
-
 const destination = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('reference') }).strict(),
   z
@@ -74,21 +38,21 @@ function validator(spec: Property) {
   return fn;
 }
 
-export function parseConfiguration(input: unknown): Configuration {
-  const config = configurationSpec.parse(input);
+/** Accepts a strict configuration or a loosely written one (see schemaInput.ts) and returns the strict form. */
+export function resolveConfiguration(input: unknown) {
+  const raw = z
+    .object({ schema: z.unknown(), identityField: z.string().optional(), destination })
+    .strict()
+    .parse(input);
+  const normalized = normalizeSchemaInput(raw.schema, raw.identityField);
+  const config = configurationSpec.parse({
+    schema: normalized.schema,
+    identityField: normalized.identityField,
+    destination: raw.destination,
+  });
   const fields = Object.keys(config.schema.properties);
-  if (
-    !fields.length ||
-    fields.length > 60 ||
-    fields.some((k) => !/^[a-zA-Z][a-zA-Z0-9_]{0,119}$/.test(k))
-  )
+  if (fields.length > 60 || fields.some((k) => !/^[a-zA-Z][a-zA-Z0-9_]{0,119}$/.test(k)))
     throw new Error('Use 1–60 named flat properties (letters, digits and underscores).');
-  if (config.schema.required.some((k) => !config.schema.properties[k]))
-    throw new Error('Every required field must exist in properties.');
-  if (config.schema.properties[config.identityField]?.type !== 'string')
-    throw new Error('The identity field must be a string property in the schema.');
-  if (!config.schema.required.includes(config.identityField))
-    throw new Error('The identity field must be listed as required.');
   for (const [name, spec] of Object.entries(config.schema.properties)) {
     try {
       validator(spec);
@@ -103,8 +67,10 @@ export function parseConfiguration(input: unknown): Configuration {
     if (['169.254.169.254', 'metadata.google.internal'].includes(url.hostname))
       throw new Error('Cloud metadata endpoints cannot be migration targets.');
   }
-  return config;
+  return { configuration: config, normalized };
 }
+export const parseConfiguration = (input: unknown): Configuration =>
+  resolveConfiguration(input).configuration;
 
 export const fieldNames = (c: Configuration) => Object.keys(c.schema.properties);
 export const isRequired = (c: Configuration, field: string) => c.schema.required.includes(field);
@@ -183,6 +149,14 @@ export function normalizeValue(c: Configuration, field: string, input: string): 
       ([k]) => key(k) === wanted,
     )?.[1];
     return { value: direct !== undefined ? String(direct) : (alias ?? value) };
+  }
+  if (spec.type === 'number' || spec.type === 'integer') {
+    // "89.90" and "89.9" are the same number; canonical text stops false source conflicts.
+    if (/^[+-]?\d+(\.\d+)?$/.test(value)) {
+      const n = Number(value);
+      if (Number.isFinite(n) && Math.abs(n) < 1e15) return { value: String(n) };
+    }
+    return { value };
   }
   if (spec.type === 'boolean') {
     const lower = value.toLowerCase();

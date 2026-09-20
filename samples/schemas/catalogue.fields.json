@@ -1,0 +1,9 @@
+{
+  "sku": "string!",
+  "name": "string!",
+  "category": "string",
+  "price": "number!",
+  "stock": "whole number",
+  "active": "yes/no",
+  "launched": "date"
+}

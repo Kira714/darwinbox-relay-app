@@ -17,6 +17,7 @@ import { audit, reconcile, resolveCase } from './engine.js';
 import { escalate } from './escalation.js';
 import { MAX_ROWS, parseFile } from './ingest.js';
 import { mapSources } from './mapping.js';
+import { normalizeSchemaInput } from './schemaInput.js';
 import { defaultConfiguration, presets } from './presets.js';
 import { Settings } from './settings.js';
 import { Store } from './store.js';
@@ -189,6 +190,55 @@ export function createApp(
     res.type('application/json').send(await readFile(resolve('api/openapi.json'), 'utf8')),
   );
   app.get('/api/presets', (_req, res) => res.json(presets));
+  app.get('/api/samples/:preset/:file', (req, res) => {
+    // Only files listed on a preset are served; nothing else under samples/ is reachable.
+    const preset = presets.find((p) => p.id === req.params.preset);
+    const file = String(req.params.file);
+    if (!preset || !preset.sample.files.includes(file))
+      throw new TargetError(404, 'Sample file not found.');
+    res.download(resolve('samples', preset.sample.folder, file), file);
+  });
+  /** Live check for the target-schema editor: normalizes whatever was typed and says what it understood. */
+  app.post('/api/configuration/validate', admin, (req, res) => {
+    const body = z
+      .object({
+        schema: z.union([
+          z.string().max(60_000),
+          z.record(z.string(), z.unknown()),
+          z.array(z.unknown()),
+        ]),
+        identityField: z.string().max(120).optional(),
+        fieldsOnly: z.boolean().optional(),
+      })
+      .strict()
+      .parse(req.body);
+    try {
+      const n = normalizeSchemaInput(body.schema, body.identityField, {
+        fieldsOnly: body.fieldsOnly,
+      });
+      const props = n.schema.properties;
+      res.json({
+        ok: true,
+        kind: n.kind,
+        schema: n.schema,
+        identityField: n.identityField,
+        identityCandidates: n.identityCandidates,
+        warnings: n.warnings,
+        fields: Object.entries(props).map(([name, p]) => ({
+          name,
+          type: p.type,
+          format: p.format,
+          enum: p.enum,
+          title: p.title,
+          description: p.description,
+          required: n.schema.required.includes(name),
+          unique: !!p['x-unique'],
+        })),
+      });
+    } catch (e) {
+      res.json({ ok: false, error: e instanceof Error ? e.message : 'Could not read that.' });
+    }
+  });
 
   app.get('/api/settings', admin, (_req, res) => {
     const webhook = settings.webhook();

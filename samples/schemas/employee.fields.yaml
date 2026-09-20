@@ -1,0 +1,8 @@
+# Field list with types. "!" marks a required field.
+employee_id: string!
+full_name: string!
+email: email!
+department: string
+job_title: string
+start_date: date
+employment_status: string

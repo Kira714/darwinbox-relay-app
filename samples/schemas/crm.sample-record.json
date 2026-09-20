@@ -1,0 +1,9 @@
+{
+  "contact_id": "C-1001",
+  "email": "mira.kapoor@example.com",
+  "company": "Northwind Traders",
+  "country": "IN",
+  "lifetime_value": 48250.75,
+  "is_customer": true,
+  "signed_up": "2024-01-12"
+}

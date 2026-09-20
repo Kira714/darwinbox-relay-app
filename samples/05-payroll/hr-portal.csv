@@ -1,0 +1,5 @@
+StaffCode,Name,Email,Band,Salary,Full Time
+PY0101,Anita Desai,ANITA.DESAI@example.com,G3,1850000,Yes
+PY0103,Julia Santos,julia.santos@example.com,G4,2650000,Yes
+PY0107,Mateo Ruiz,mateo.ruiz@example.com,G2,1300000,Yes
+PY0108,Zainab Sheikh,zainab.sheikh@example.com,G1,700000,No

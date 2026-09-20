@@ -13,18 +13,25 @@ import type { Candidate, Mapping, Run, Source } from './types.js';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
 
-/** A typed target only accepts a column whose populated values could actually satisfy it. */
+/** Share of populated values that must satisfy a typed target before a column may map to it. */
+const FIT_THRESHOLD = 0.6;
+
+/**
+ * A typed target only accepts a column whose populated values mostly satisfy it. This catches wrong
+ * mappings (names proposed for a date field fit ~0%) without punishing a column for one dirty cell:
+ * those cells surface later as record-level cases, which is the right question to ask a person.
+ */
 function valuesFit(run: Run, field: string, values: string[]) {
   const spec = specOf(run.configuration, field);
   const typed = spec.format || spec.enum || spec.pattern || spec.type !== 'string';
   if (!typed) return true;
-  return values
-    .filter((v) => v.trim())
-    .slice(0, 25)
-    .every((v) => {
-      const n = normalizeValue(run.configuration, field, v);
-      return !!n.options || !validateValue(run.configuration, field, n.value);
-    });
+  const sample = values.filter((v) => v.trim()).slice(0, 25);
+  if (!sample.length) return true;
+  const fitting = sample.filter((v) => {
+    const n = normalizeValue(run.configuration, field, v);
+    return !!n.options || !validateValue(run.configuration, field, n.value);
+  });
+  return fitting.length / sample.length >= FIT_THRESHOLD;
 }
 
 /**

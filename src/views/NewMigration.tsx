@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ArrowRight,
   Bot,
@@ -16,39 +16,9 @@ import {
 } from 'lucide-react';
 import { request } from '../auth';
 import type { AiInfo, Preset, Run, User } from '../types';
-import { Badge } from '../ui';
+import { TargetSchemaStep, type ResolvedTarget } from './TargetSchemaStep';
 
 type Preview = { name: string; rows: number; columns: { name: string; sample: string[] }[] };
-type FieldRow = {
-  name: string;
-  type: string;
-  format?: string;
-  required: boolean;
-  enum?: unknown[];
-  description?: string;
-};
-type Parsed = { fields: FieldRow[]; error?: string };
-
-function parseSchema(text: string): Parsed {
-  try {
-    const schema = JSON.parse(text);
-    if (!schema || typeof schema.properties !== 'object' || Array.isArray(schema.properties))
-      return { fields: [], error: 'The schema needs a "properties" object.' };
-    const required: string[] = Array.isArray(schema.required) ? schema.required : [];
-    return {
-      fields: Object.entries<Record<string, unknown>>(schema.properties).map(([name, p]) => ({
-        name,
-        type: String(p?.type ?? '?'),
-        format: p?.format as string | undefined,
-        enum: p?.enum as unknown[] | undefined,
-        description: (p?.description as string) || undefined,
-        required: required.includes(name),
-      })),
-    };
-  } catch (e) {
-    return { fields: [], error: (e as Error).message };
-  }
-}
 
 const isUrl = (v: string) => {
   try {
@@ -76,16 +46,10 @@ export function NewMigration({
     state: 'idle' | 'loading' | 'ok' | 'error';
     sources: Preview[];
     error?: string;
-  }>({
-    state: 'idle',
-    sources: [],
-  });
+  }>({ state: 'idle', sources: [] });
   const [dragging, setDragging] = useState(false);
   const [presets, setPresets] = useState<Preset[]>([]);
-  const [presetId, setPresetId] = useState('employee');
-  const [schemaText, setSchemaText] = useState('');
-  const [showJson, setShowJson] = useState(false);
-  const [identityField, setIdentityField] = useState('employee_id');
+  const [target, setTarget] = useState<ResolvedTarget | null>(null);
   const [destKind, setDestKind] = useState<'reference' | 'http'>('reference');
   const [url, setUrl] = useState('');
   const [authorization, setAuthorization] = useState('');
@@ -93,17 +57,11 @@ export function NewMigration({
   const consultants = users.filter((u) => u.role === 'ic' && u.active);
   const [assignedTo, setAssignedTo] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loadingSamples, setLoadingSamples] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    void request<Preset[]>('/api/presets').then((list) => {
-      setPresets(list);
-      const first = list[0];
-      if (first) {
-        setSchemaText(JSON.stringify(first.schema, null, 2));
-        setIdentityField(first.identityField);
-      }
-    });
+    void request<Preset[]>('/api/presets').then(setPresets);
   }, []);
   useEffect(() => {
     if (!assignedTo && consultants[0]) setAssignedTo(consultants[0].id);
@@ -127,27 +85,35 @@ export function NewMigration({
     };
   }, [files]);
 
-  const parsed = useMemo(() => parseSchema(schemaText), [schemaText]);
-  const fields = parsed.fields;
-  const idCandidates = fields.filter((f) => f.type === 'string');
-  useEffect(() => {
-    if (idCandidates.length && !idCandidates.some((f) => f.name === identityField))
-      setIdentityField((idCandidates.find((f) => f.required) || idCandidates[0]).name);
-  }, [schemaText]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const choosePreset = (id: string) => {
-    setPresetId(id);
-    const preset = presets.find((p) => p.id === id);
-    if (preset) {
-      setSchemaText(JSON.stringify(preset.schema, null, 2));
-      setIdentityField(preset.identityField);
-    } else setShowJson(true);
-  };
   function addFiles(list: FileList | File[]) {
     const next = [...files];
     for (const f of Array.from(list))
       if (!next.some((x) => x.name === f.name && x.size === f.size)) next.push(f);
     setFiles(next);
+  }
+  const samplePreset = presets.find((p) => p.id === target?.samplePreset);
+  /** Fills the drop zone with the sample files that go with the chosen target. Nothing runs until Generate. */
+  async function useSamples() {
+    if (!samplePreset) return;
+    setLoadingSamples(true);
+    setError('');
+    try {
+      const loaded = await Promise.all(
+        samplePreset.sample.files.map(async (file) => {
+          const r = await fetch(`/api/samples/${samplePreset.id}/${file}`, {
+            credentials: 'same-origin',
+          });
+          if (!r.ok) throw new Error(`Could not load ${file}.`);
+          return new File([await r.blob()], file);
+        }),
+      );
+      setFiles(loaded);
+      if (!name.trim()) setName(`${samplePreset.name} — sample`);
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setLoadingSamples(false);
+    }
   }
 
   const totalRows = preview.sources.reduce((n, s) => n + s.rows, 0);
@@ -155,14 +121,14 @@ export function NewMigration({
   const consultant = consultants.find((u) => u.id === assignedTo);
   const missing = [
     preview.state !== 'ok' && 'Add source files that read correctly',
-    parsed.error && 'Fix the target schema',
-    !parsed.error && !idCandidates.length && 'The schema needs a string field to identify records',
+    !target && 'Finish the target fields (step 2)',
     destKind === 'http' && !isUrl(url) && 'Enter the endpoint URL',
     name.trim().length < 3 && 'Name the migration',
     !assignedTo && 'Choose who receives escalations',
   ].filter(Boolean) as string[];
 
   async function generate() {
+    if (!target) return;
     setBusy(true);
     setError('');
     try {
@@ -172,8 +138,8 @@ export function NewMigration({
       form.append(
         'configuration',
         JSON.stringify({
-          schema: JSON.parse(schemaText),
-          identityField,
+          schema: target.schema,
+          identityField: target.identityField,
           destination:
             destKind === 'http' ? { kind: 'http', url: url.trim() } : { kind: 'reference' },
         }),
@@ -248,6 +214,23 @@ export function NewMigration({
               </span>
               <small>2 MB per file · 5,000 rows total</small>
             </button>
+            {samplePreset && (
+              <p className="sample-offer">
+                No files handy?{' '}
+                <button
+                  className="text-button inline"
+                  disabled={loadingSamples}
+                  onClick={() => void useSamples()}
+                >
+                  {loadingSamples ? (
+                    <Loader2 size={12} className="spin" />
+                  ) : (
+                    <FileSpreadsheet size={12} />
+                  )}{' '}
+                  Use the {samplePreset.sample.files.length} sample files for “{samplePreset.name}”
+                </button>
+              </p>
+            )}
             {preview.state === 'loading' && (
               <p className="step-note">
                 <Loader2 className="spin" size={14} /> Reading files…
@@ -302,98 +285,10 @@ export function NewMigration({
             <StepHeading
               n={2}
               icon={<Database size={18} />}
-              title="Target schema"
+              title="Target fields"
               hint="What each record must look like when it reaches the destination."
             />
-            <div className="row-fields">
-              <label>
-                Schema
-                <select
-                  value={presets.some((p) => p.id === presetId) ? presetId : 'custom'}
-                  onChange={(e) => choosePreset(e.target.value)}
-                >
-                  {presets.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                    </option>
-                  ))}
-                  <option value="custom">Custom JSON Schema</option>
-                </select>
-              </label>
-              <label>
-                Identity field
-                <select value={identityField} onChange={(e) => setIdentityField(e.target.value)}>
-                  {idCandidates.map((f) => (
-                    <option key={f.name} value={f.name}>
-                      {f.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <p className="field-hint">
-              The identity field decides which rows from different files are the same record.
-            </p>
-            {parsed.error ? (
-              <div className="inline-error" role="alert">
-                <CircleAlert size={15} />
-                Invalid JSON: {parsed.error}
-              </div>
-            ) : (
-              <div className="field-table" role="table" aria-label="Target fields">
-                {fields.map((f) => (
-                  <div role="row" key={f.name}>
-                    <code>{f.name}</code>
-                    <span>
-                      {f.enum ? f.enum.join(' | ') : f.format ? `${f.type} · ${f.format}` : f.type}
-                    </span>
-                    <Badge tone={f.required ? 'purple' : 'neutral'}>
-                      {f.required ? 'Required' : 'Optional'}
-                    </Badge>
-                  </div>
-                ))}
-              </div>
-            )}
-            <button className="text-button" onClick={() => setShowJson(!showJson)}>
-              {showJson ? 'Hide' : 'Edit'} JSON Schema
-            </button>
-            {showJson && (
-              <>
-                <textarea
-                  className="json-editor"
-                  spellCheck={false}
-                  rows={14}
-                  value={schemaText}
-                  aria-label="Target JSON Schema"
-                  onChange={(e) => {
-                    setSchemaText(e.target.value);
-                    setPresetId('custom');
-                  }}
-                />
-                <div className="row-actions">
-                  <label className="text-button file-button">
-                    Load a .json file
-                    <input
-                      type="file"
-                      accept=".json,application/json"
-                      className="sr-only"
-                      onChange={async (e) => {
-                        const f = e.target.files?.[0];
-                        if (f && f.size < 60000) {
-                          setSchemaText(await f.text());
-                          setPresetId('custom');
-                        }
-                        e.target.value = '';
-                      }}
-                    />
-                  </label>
-                  <small>
-                    Flat properties: string, number, integer, boolean · required · format email/date
-                    · enum · min/max · <code>x-aliases</code>
-                  </small>
-                </div>
-              </>
-            )}
+            <TargetSchemaStep presets={presets} onResolved={setTarget} />
           </section>
 
           {/* 3 — destination */}
@@ -502,11 +397,11 @@ export function NewMigration({
                   ? `${preview.sources.length} sheets · ${totalRows} rows · ${totalColumns} columns`
                   : 'No files yet'}
               </li>
-              <li className={!parsed.error && idCandidates.length ? 'ok' : ''}>
+              <li className={target ? 'ok' : ''}>
                 <Check size={14} />{' '}
-                {parsed.error
-                  ? 'Schema is not valid JSON'
-                  : `${fields.length} target fields · ${fields.filter((f) => f.required).length} required`}
+                {target
+                  ? `${target.fields.length} target fields · ${target.fields.filter((f) => f.required).length} required · ID ${target.identityField}`
+                  : 'Target fields not ready'}
               </li>
               <li className={destKind === 'reference' || isUrl(url) ? 'ok' : ''}>
                 <Check size={14} />{' '}
@@ -536,8 +431,8 @@ export function NewMigration({
                   <>
                     <strong>AI mapping is off</strong>
                     <small>
-                      The agent will only recognise known column names and will ask a person about
-                      the rest.
+                      The agent will only recognise column names that match a field and will ask a
+                      person about the rest.
                     </small>
                   </>
                 )}

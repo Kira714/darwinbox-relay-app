@@ -1,0 +1,89 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Payroll roster",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "staffCode",
+    "fullName",
+    "workEmail",
+    "salary"
+  ],
+  "properties": {
+    "staffCode": {
+      "type": "string",
+      "title": "Staff code",
+      "description": "Unique payroll code: two capital letters and four digits.",
+      "pattern": "^[A-Z]{2}\\d{4}$",
+      "x-aliases": [
+        "staff code",
+        "employee id"
+      ]
+    },
+    "fullName": {
+      "type": "string",
+      "title": "Full name",
+      "description": "The employee's full legal name.",
+      "minLength": 2,
+      "x-aliases": [
+        "name",
+        "employee name"
+      ]
+    },
+    "workEmail": {
+      "type": "string",
+      "format": "email",
+      "title": "Work email",
+      "description": "Company email address.",
+      "x-unique": true,
+      "x-aliases": [
+        "email",
+        "email address"
+      ]
+    },
+    "grade": {
+      "type": "string",
+      "title": "Pay grade",
+      "description": "Pay band from G1 (junior) to G4 (senior).",
+      "enum": [
+        "G1",
+        "G2",
+        "G3",
+        "G4"
+      ],
+      "x-aliases": [
+        "band",
+        "pay band"
+      ]
+    },
+    "salary": {
+      "type": "integer",
+      "title": "Annual salary",
+      "description": "Annual compensation in whole rupees.",
+      "minimum": 0,
+      "x-aliases": [
+        "salary",
+        "annual salary"
+      ]
+    },
+    "fullTime": {
+      "type": "boolean",
+      "title": "Full time",
+      "description": "Whether the employee works full time.",
+      "x-aliases": [
+        "full time"
+      ]
+    },
+    "joinedOn": {
+      "type": "string",
+      "format": "date",
+      "title": "Joining date",
+      "description": "Date the employee joined.",
+      "x-aliases": [
+        "date joined",
+        "joined on",
+        "joining date"
+      ]
+    }
+  }
+}

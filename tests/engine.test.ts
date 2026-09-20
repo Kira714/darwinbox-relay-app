@@ -186,3 +186,14 @@ test('schemas that cannot be honoured are rejected up front', () => {
     /credentials/,
   );
 });
+
+test('numbers are canonicalized so equal values from two sources never conflict', async () => {
+  const custom = parseConfiguration({
+    schema: { sku: 'string!', price: 'number', qty: 'whole number' },
+    destination: { kind: 'reference' },
+  });
+  const run = await csvRun('sku,price,qty\nA,89.90,007\nA,89.9,7\nB,1e3,5', null, custom);
+  assert.equal(run.cases.length, 0, JSON.stringify(run.cases));
+  assert.equal(run.records[0].data.price, '89.9');
+  assert.equal(run.records[0].data.qty, '7');
+});

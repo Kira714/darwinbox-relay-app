@@ -268,6 +268,121 @@
       "name": "3 \u00b7 Migrate",
       "item": [
         {
+          "name": "Understand a target: names only",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/configuration/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "configuration",
+                "validate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema\": \"employee_id, full_name, email, start_date, salary\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Understand a target: names + types (! = required)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/configuration/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "configuration",
+                "validate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema\": {\n    \"sku\": \"string!\",\n    \"price\": \"number!\",\n    \"stock\": \"whole number\"\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Understand a target: sample record",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/configuration/validate",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "configuration",
+                "validate"
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"schema\": {\n    \"id\": \"C-1\",\n    \"email\": \"a@b.co\",\n    \"spend\": 48250.75,\n    \"active\": true\n  }\n}"
+            }
+          }
+        },
+        {
+          "name": "Ready-made targets",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "x-csrf-token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/presets",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "presets"
+              ]
+            }
+          }
+        },
+        {
           "name": "Preview files (nothing is created)",
           "request": {
             "method": "POST",

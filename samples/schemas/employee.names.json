@@ -1,0 +1,9 @@
+[
+  "employee_id",
+  "full_name",
+  "email",
+  "department",
+  "job_title",
+  "start_date",
+  "employment_status"
+]

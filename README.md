@@ -6,7 +6,7 @@ Built for the Darwinbox *Forward Deployed Engineer* take-home: *Build an AI Agen
 
 - **Multi-file ingestion** — several `.xlsx`/`.csv` files (every sheet), different column names and date formats, reconciled into one dataset by an identity field.
 - **AI column mapping** — free open-weight models through [OpenRouter](https://openrouter.ai) (bring your own key, entered once, stored encrypted). The model only *proposes*; deterministic code decides what is accepted.
-- **Any target** — pick the Employee preset or paste your own JSON Schema; choose the built-in mock API or any HTTP endpoint that accepts a JSON `POST`.
+- **Any target** — define the fields yourself (names alone are enough), pick a ready-made target, or paste a JSON Schema / sample record / YAML; send to the built-in mock API or any HTTP endpoint that accepts a JSON `POST`.
 - **Escalation, not guessing** — ambiguous dates, conflicting values, low-confidence mappings, invalid or missing data, identity collisions and delivery failures go to the assigned consultant with a reason (and optionally a Slack-compatible webhook).
 - **Safe delivery** — idempotent per-record writes, retry of only what failed, a circuit breaker for a broken target, and compare-before-restore rollback on the built-in target.
 - **Everything is audited** — who decided what, why, and what changed, with row-level lineage back to the source files.
@@ -32,12 +32,35 @@ Passwords are random: `cat .data/credentials-*.json`. Use a normal window for th
 ### Use it
 
 1. **AI & alerts** (admin, sidebar) → paste your OpenRouter key → **Test connection** → **Save**. Get a free key at <https://openrouter.ai/keys>. The key is encrypted at rest and never shown again.
-2. **New migration** → drop the files in `samples/04-helix/` → keep the *Employee directory* schema → **Relay mock API** → pick who gets escalations → **Generate**.
+2. **New migration** → drop the files in `samples/04-helix/` (or click *Use the sample files*) → keep the *Employee directory* target → **Relay mock API** → pick who gets escalations → **Generate**.
 3. Watch the agent work. It maps, cleans, and escalates what it cannot safely decide.
 4. Sign in as the consultant → open the migration → resolve each case (a reason is required). The last resolution starts delivery automatically.
 5. **Mock target** (admin) shows exactly what the API received.
 
 The script for a demo video, including failure/retry/rollback, is in [docs/demo.md](docs/demo.md).
+
+## Define the target (step 2)
+
+Three ways, all checked live by the server, which tells you exactly what it understood and what it had to guess:
+
+| Tab | Use it when | What you do |
+| --- | --- | --- |
+| **Ready-made** | you want to try something now | Pick *Employee directory*, *Payroll roster*, *CRM contacts* or *Product catalogue*; each has sample files (**Use the sample files** in step 1) |
+| **Build fields** | you know the fields but don't want to write JSON | **Add field**, type a name, pick a type, flip **Required**, tap the key to choose the field that identifies each record. Or type `sku, name, price` into *quick add*. Add a description and the AI matches columns better |
+| **Paste or upload** | you already have something | Paste or upload any of the formats below (JSON or YAML) |
+
+**Accepted input** — the more you give, the less is inferred:
+
+| You give | Example | What happens |
+| --- | --- | --- |
+| Just names | `employee_id, full_name, email` · `["sku","name"]` · `{"sku": "", "name": ""}` | Types inferred from the names (`email` → email, `*_date` → date, `salary` → number, `is_*` → yes/no); only the identity field is required. Shown as a warning so nothing is silent |
+| Names + types | `{"sku": "string!", "price": "number!", "stock": "whole number", "launched": "date"}` | `!` = required |
+| Field objects | `[{"name":"salary","type":"number","required":true,"minimum":0}]` | Full control per field |
+| Sample record | `{"id":"C-1","email":"a@b.co","spend":48250.75,"active":true}` | Types read from the values |
+| JSON Schema | see [`samples/schemas/payroll.schema.json`](samples/schemas/payroll.schema.json) | `required`, `enum`, `pattern`, `minimum/maximum`, `format: email|date`, `x-aliases`, `x-value-aliases`. Loosely written schemas are fine |
+| YAML | [`samples/schemas/employee.fields.yaml`](samples/schemas/employee.fields.yaml) | Same as any of the above |
+
+Flat fields only: nested objects/lists are refused with advice (flatten `address` into `address_city`). Field names may contain letters, digits and underscores; anything else is renamed and the rename is reported. Example inputs for every format are in [`samples/schemas/`](samples/schemas) — the *Paste or upload* tab has a button for each.
 
 ## Sample scenarios
 
@@ -47,6 +70,9 @@ The script for a demo video, including failure/retry/rollback, is in [docs/demo.
 | [`01-meridian`](samples/01-meridian) | 2 × CSV | Fully autonomous: cleanup + duplicate reconciliation, no escalation |
 | [`02-northstar`](samples/02-northstar) | 2 × CSV | Ambiguous date, conflicting department, missing email |
 | [`03-cedar`](samples/03-cedar) | 2 × CSV | Identity collision, impossible date, and a rejected record |
+| [`05-payroll`](samples/05-payroll) | xlsx + csv | *Payroll roster* target: camelCase fields, integer salary, yes/no, pay grades. A salary written `1,150,000`, an invalid grade `G5`, a salary conflict, an ambiguous date |
+| [`06-crm`](samples/06-crm) | csv + xlsx | *CRM contacts* target: country names → ISO codes automatically; a decoy `Subscribed` column; invalid country `Narnia`; negative spend |
+| [`07-catalogue`](samples/07-catalogue) | csv + xlsx | *Product catalogue* target: `19,99` decimal comma, lowercase SKU, `many` as stock, stock conflict |
 
 All data is synthetic. Details and expected outcomes: [samples/README.md](samples/README.md).
 
@@ -87,7 +113,7 @@ React 19 + Vite + TypeScript UI · Express 5 API · SQLite (`node:sqlite`) · Ex
 | --- | --- |
 | `npm run dev` | API on :3001 + Vite dev server with hot reload on :5173 |
 | `npm run check` | typecheck + unit/integration tests + production build |
-| `npm test` | 44 tests: engine, AI client against a fake OpenRouter, HTTP API, auth, rollback safety |
+| `npm test` | 61 tests: engine, AI client against a fake OpenRouter, HTTP API, auth, rollback safety |
 | `npm run test:browser` | Real Chromium end-to-end (stubbed model, disposable DB); screenshots in `test-results/e2e/` |
 | `npm run mock:start` | Standalone mock API on :4001 to use as a *custom endpoint* (`POST /employees`, `GET /records`, `POST /fail-next`) |
 | `npm run samples` | Regenerate the Excel demo files |

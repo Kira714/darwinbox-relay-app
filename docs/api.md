@@ -24,9 +24,22 @@ curl -sb jar -H "x-csrf-token: $T" -F name='Helix' -F assignedTo=<consultant-id>
 curl -sb jar $B/api/runs/<id>
 ```
 
+## Checking a target definition
+
+`POST /api/configuration/validate` (admin) takes the same loose input the UI accepts and returns what it understood, without creating anything:
+
+```bash
+curl -sb jar -H "x-csrf-token: $T" -H 'Content-Type: application/json' -X POST $B/api/configuration/validate \
+  -d '{"schema": "sku, name, price, launched_on"}'
+# → {"ok":true,"kind":"field-names","identityField":"sku","fields":[{"name":"sku","type":"string","required":true},…],
+#    "warnings":["Only names were given, so types were inferred …"],"schema":{…strict JSON Schema…}}
+```
+
+`schema` may be a string (JSON, YAML or plain names) or an object/array. `identityField` (optional) forces the ID field; `fieldsOnly` accepts a list with no ID yet. Problems come back as `{"ok":false,"error":"…"}` with advice. `GET /api/samples/{preset}/{file}` downloads a ready-made target's sample files (whitelisted; sign-in required).
+
 ## Custom target
 
-`configuration` (form field, JSON) selects the schema and destination. Omit it for the Employee preset + built-in mock API.
+`configuration` (form field, JSON) selects the schema and destination; `schema` may be loose (names, sample record, …) and `identityField` may be omitted. Omit `configuration` for the Employee preset + built-in mock API.
 
 ```json
 {

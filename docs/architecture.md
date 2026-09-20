@@ -27,8 +27,10 @@ Browser (React)  ──HTTP/JSON──▶  Express API ──▶ SQLite (users, 
 
 | Path | Responsibility |
 | --- | --- |
-| `server/configuration.ts` | JSON-Schema subset, presets-independent validation, normalization, typed payloads |
-| `server/presets.ts` | Employee schema preset (aliases and value aliases live in the schema as `x-*` keys) |
+| `server/schema.ts` | The strict flat JSON-Schema subset (zod) |
+| `server/schemaInput.ts` | Turns names / field lists / sample records / JSON Schema / YAML into that strict schema; infers and reports what was not given |
+| `server/configuration.ts` | Validation, cleanup normalization (dates, enums, numbers, booleans), typed payloads, configuration resolution |
+| `server/presets.ts` | Ready-made targets (Employee, Payroll, CRM, Catalogue) with their sample files; aliases live in the schema as `x-*` keys |
 | `server/ingest.ts` | Excel (all sheets) / CSV parsing with bounds, formula refusal, line provenance |
 | `server/profile.ts` | Local column profiling (kind, shapes, cardinality) — what the AI sees |
 | `server/ai.ts` | OpenRouter client, prompt, tolerant/strict output parsing, model list, connection test |
@@ -41,7 +43,7 @@ Browser (React)  ──HTTP/JSON──▶  Express API ──▶ SQLite (users, 
 | `server/target.ts` | Built-in mock API: receipts, versions, compare-before-restore |
 | `server/store.ts` | SQLite persistence, run snapshots, insert-only audit, legacy-run upgrade |
 | `server/app.ts` | Routes and orchestration |
-| `src/` | React UI: `views/NewMigration`, `RunView`, `Review`, `Records`, `Settings`, `TargetMonitor` |
+| `src/` | React UI: `views/NewMigration`, `TargetSchemaStep` (presets · field builder · paste/upload), `RunView`, `Review`, `Records`, `Settings`, `TargetMonitor` |
 
 ## Data model (SQLite)
 

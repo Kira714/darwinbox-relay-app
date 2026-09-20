@@ -2,7 +2,7 @@
   "openapi": "3.0.3",
   "info": {
     "title": "Relay API",
-    "version": "3.0.0",
+    "version": "3.1.0",
     "description": "Multi-file employee (or any schema-driven) data migration with AI-assisted column mapping, human escalation, idempotent delivery and rollback. Sign in with POST /api/auth/login (cookie session), then send the returned csrfToken as the x-csrf-token header on every non-GET request."
   },
   "servers": [
@@ -203,7 +203,7 @@
     },
     "/api/presets": {
       "get": {
-        "summary": "Built-in target schemas",
+        "summary": "Ready-made targets with their schemas and sample files",
         "tags": [
           "Migrations"
         ],
@@ -921,6 +921,102 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/configuration/validate": {
+      "post": {
+        "summary": "Understand a target definition (names, typed fields, sample record, JSON Schema, YAML) without creating anything",
+        "tags": [
+          "Migrations"
+        ],
+        "description": "Administrator only. Returns the strict schema, the identity field, inferred-type warnings, and the fields. Errors come back as {ok:false,error}.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "schema"
+                ],
+                "properties": {
+                  "schema": {
+                    "description": "String (JSON, YAML or names) or object/array",
+                    "oneOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object"
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      }
+                    ]
+                  },
+                  "identityField": {
+                    "type": "string"
+                  },
+                  "fieldsOnly": {
+                    "type": "boolean"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "{ok:true,kind,schema,identityField,identityCandidates,warnings,fields} or {ok:false,error}"
+          },
+          "401": {
+            "description": "Not signed in"
+          },
+          "403": {
+            "description": "Administrators only"
+          }
+        }
+      }
+    },
+    "/api/samples/{preset}/{file}": {
+      "get": {
+        "summary": "Download a sample file of a ready-made target",
+        "tags": [
+          "Migrations"
+        ],
+        "parameters": [
+          {
+            "name": "preset",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "employee",
+                "payroll",
+                "crm",
+                "catalogue"
+              ]
+            }
+          },
+          {
+            "name": "file",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The file"
+          },
+          "404": {
+            "description": "Not a listed sample file"
           }
         }
       }

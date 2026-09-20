@@ -26,6 +26,7 @@ export type Preset = {
   name: string;
   description: string;
   identityField: string;
+  sample: { folder: string; files: string[] };
   schema: { required?: string[]; properties: Record<string, SchemaProperty> } & Record<
     string,
     unknown

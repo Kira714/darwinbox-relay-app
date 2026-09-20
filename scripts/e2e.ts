@@ -33,6 +33,20 @@ const answers: Record<string, [string | null, number]> = {
   'Emp Status': ['employment_status', 0.7],
   'Favourite Colour': [null, 0.98],
   'Manager Name': [null, 0.97],
+  'Item Code': ['sku', 0.97],
+  SKU: ['sku', 0.99],
+  'Product Title': ['name', 0.96],
+  Title: ['name', 0.96],
+  'Unit Price': ['price', 0.95],
+  'Price (USD)': ['price', 0.93],
+  'Qty On Hand': ['stock', 0.94],
+  Stock: ['stock', 0.97],
+  'Live?': ['is_active', 0.9],
+  Published: ['is_active', 0.9],
+  Dept: [null, 0.9],
+  Category: [null, 0.9],
+  'Launch Date': [null, 0.9],
+  'First Listed': [null, 0.9],
 };
 const model = await fakeOpenRouter(({ body }) => {
   const request = JSON.parse((body.messages as { content: string }[])[1].content) as {
@@ -177,7 +191,65 @@ try {
   await admin.screenshot({ path: `${out}/5-mock-target.png` });
   await admin.keyboard.press('Escape');
 
-  // 4 — narrow screens: no horizontal scrolling on the composer or a run
+  // 4 — define the target by hand: build fields, names only, errors explained, then Generate
+  const editor = await open('admin@e2e.example');
+  await editor.getByRole('heading', { name: 'New migration' }).waitFor();
+  await editor.getByRole('tab', { name: 'Build fields' }).click();
+  while (await editor.locator('.builder-row').count())
+    await editor
+      .getByRole('button', { name: /^Remove / })
+      .first()
+      .click();
+  await editor.getByText('Add at least one field to continue.').waitFor();
+  await editor.getByLabel('Add several fields by name').fill('sku, name, price, stock, is_active');
+  await editor.getByLabel('Add several fields by name').press('Enter');
+  await editor.locator('.understood-head', { hasText: '5 fields' }).waitFor();
+  await editor.getByLabel('name is required').click();
+  await editor.getByLabel('price is required').click();
+  await editor.locator('.understood-head', { hasText: '3 required' }).waitFor(); // sku (the ID) + name + price
+  assert.equal(await editor.getByLabel('sku is required').getAttribute('aria-checked'), 'true');
+  assert.ok(
+    await editor.getByLabel('sku is required').isDisabled(),
+    'the ID field is always required',
+  );
+  await editor.screenshot({ path: `${out}/6-builder.png`, fullPage: true });
+  await editor.getByRole('tab', { name: 'Paste or upload' }).click();
+  await editor
+    .getByLabel('Target definition', { exact: true })
+    .fill('employee_id, full_name, email');
+  await editor.locator('.understood-head', { hasText: 'field names only' }).waitFor();
+  await editor
+    .getByLabel('Target definition', { exact: true })
+    .fill('{"id": "1", "address": {"city": "Pune"}}');
+  await editor.locator('.inline-error', { hasText: 'address_city' }).waitFor();
+  await editor.getByRole('tab', { name: 'Build fields' }).click();
+  await editor.locator('.understood-head', { hasText: '5 fields' }).waitFor();
+  await editor.setInputFiles('input[aria-label="Choose source files"]', [
+    'samples/07-catalogue/warehouse.csv',
+    'samples/07-catalogue/webshop.xlsx',
+  ]);
+  await editor.getByText('webshop.xlsx · Products').waitFor();
+  await editor.getByLabel('Migration name').fill('Hand-built catalogue');
+  await editor.getByRole('button', { name: /^Generate/ }).click();
+  await editor.locator('.escalation').waitFor({ timeout: 30_000 });
+  assert.match(await editor.locator('.escalation').innerText(), /Escalated to Sam Consultant/);
+  await editor.getByRole('tab', { name: 'Field mappings' }).click();
+  assert.ok(
+    (await editor.locator('.badge', { hasText: /^AI \d+%$/ }).count()) >= 3,
+    'the AI mapped columns to the hand-built fields',
+  );
+  await editor.screenshot({ path: `${out}/7-handbuilt-run.png` });
+
+  // 5 — a ready-made target loads its own sample files in one click
+  const samples = await open('admin@e2e.example');
+  await samples.getByRole('heading', { name: 'New migration' }).waitFor();
+  await samples.getByRole('radio', { name: /Payroll roster/ }).click();
+  await samples.getByRole('button', { name: /Use the 2 sample files/ }).click();
+  await samples.getByText('hr-portal.csv').first().waitFor();
+  await samples.locator('.preview-card', { hasText: 'finance-ledger.xlsx' }).waitFor();
+  assert.equal(await samples.locator('.file-list li').count(), 2);
+
+  // 6 — narrow screens: no horizontal scrolling on the composer or a run
   const phone = await open('admin@e2e.example', { width: 390, height: 800 });
   await phone.getByRole('heading', { name: 'New migration' }).waitFor();
   await noHorizontalScroll(phone, 'composer at 390px');
