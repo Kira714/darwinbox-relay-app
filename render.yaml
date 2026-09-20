@@ -1,0 +1,20 @@
+# Render Blueprint: New → Blueprint → pick this repo. Free plan (sleeps after 15 min idle, disk is
+# wiped on restart — accounts and the AI key come back from the environment variables below).
+services:
+  - type: web
+    name: darwinbox-relay-app
+    runtime: node
+    plan: free
+    buildCommand: npm ci --include=dev && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: ADMIN_PASSWORD # at least 12 characters
+        sync: false
+      - key: IC_PASSWORD # at least 12 characters
+        sync: false
+      - key: OPENROUTER_API_KEY
+        sync: false
+      - key: RELAY_SECRET_KEY
+        generateValue: true

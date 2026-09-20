@@ -44,6 +44,8 @@ export function createApp(
 
   const app = express();
   app.disable('x-powered-by');
+  // Behind a hosting proxy the client address is in X-Forwarded-For (login throttling uses it).
+  if (process.env.RENDER || process.env.TRUST_PROXY) app.set('trust proxy', 1);
   // Same-origin (or local development) requests only; state changes also need the CSRF token.
   app.use((req, res, next) => {
     const origin = req.get('origin');

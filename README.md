@@ -96,6 +96,8 @@ The line between "do it" and "ask" is deliberate and written down in [docs/auton
 | `DB_PATH` | `.data/relay-operations.sqlite` | SQLite file (users, runs, audit, mock target, encrypted settings) |
 | `RELAY_SECRET_KEY` | generated at `.data/secret.key` | Master key for encrypting stored secrets |
 | `OPENROUTER_API_KEY` | — | Optional fallback if no key was saved in the UI |
+| `ADMIN_PASSWORD` / `IC_PASSWORD` | — | Create the admin / consultant on boot if missing (12+ chars). For hosts with an ephemeral disk |
+| `RENDER` / `TRUST_PROXY` | — | Set automatically on Render: bind `0.0.0.0`, `Secure` cookies, trust the proxy |
 | `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | Point at another OpenAI-compatible gateway |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 
@@ -119,4 +121,5 @@ React 19 + Vite + TypeScript UI · Express 5 API · SQLite (`node:sqlite`) · Ex
 | `npm run samples` | Regenerate the Excel demo files |
 
 API reference: [docs/api.md](docs/api.md) · [`api/openapi.json`](api/openapi.json) · [Postman collection](api/relay.postman_collection.json).
+Deploying for free on Render: [docs/deploy.md](docs/deploy.md).
 Scope and known gaps: [docs/known-limitations.md](docs/known-limitations.md). This is a single-workspace prototype against a mock target — not a hosted production service or a live Darwinbox integration.

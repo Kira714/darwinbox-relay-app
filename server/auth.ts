@@ -82,7 +82,8 @@ function token(req: Request) {
 const cookieOptions = {
   httpOnly: true,
   sameSite: 'strict' as const,
-  secure: process.env.COOKIE_SECURE === 'true',
+  // Secure cookies by default on Render (HTTPS only); otherwise opt in with COOKIE_SECURE=true.
+  secure: process.env.COOKIE_SECURE ? process.env.COOKIE_SECURE === 'true' : !!process.env.RENDER,
   path: '/',
 };
 export function installAuth(app: Express, store: Store, serviceToken: string) {
