@@ -1,0 +1,929 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Relay API",
+    "version": "3.0.0",
+    "description": "Multi-file employee (or any schema-driven) data migration with AI-assisted column mapping, human escalation, idempotent delivery and rollback. Sign in with POST /api/auth/login (cookie session), then send the returned csrfToken as the x-csrf-token header on every non-GET request."
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:3001"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Auth"
+    },
+    {
+      "name": "Settings"
+    },
+    {
+      "name": "Migrations"
+    },
+    {
+      "name": "Review"
+    },
+    {
+      "name": "Recovery"
+    },
+    {
+      "name": "Mock target"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "session": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "relay_session"
+      },
+      "csrf": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-csrf-token"
+      },
+      "service": {
+        "type": "apiKey",
+        "in": "header",
+        "name": "x-relay-service",
+        "description": "Internal credential held only by the migration service."
+      }
+    }
+  },
+  "security": [
+    {
+      "session": [],
+      "csrf": []
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "Liveness",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "Sign in",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "email": {
+                    "type": "string"
+                  },
+                  "password": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "email",
+                  "password"
+                ]
+              }
+            }
+          }
+        },
+        "security": []
+      }
+    },
+    "/api/auth/me": {
+      "get": {
+        "summary": "Current user and CSRF token",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "post": {
+        "summary": "Sign out",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        }
+      }
+    },
+    "/api/auth/password": {
+      "post": {
+        "summary": "Change your password (revokes all sessions)",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "currentPassword": {
+                    "type": "string"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 12
+                  }
+                },
+                "required": [
+                  "currentPassword",
+                  "newPassword"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users": {
+      "get": {
+        "summary": "List team accounts",
+        "tags": [
+          "Auth"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. "
+      }
+    },
+    "/api/presets": {
+      "get": {
+        "summary": "Built-in target schemas",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        }
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "summary": "AI and alert settings (secrets are never returned)",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. "
+      }
+    },
+    "/api/settings/ai": {
+      "put": {
+        "summary": "Save the OpenRouter key (optional after first save), model, confidence threshold and sample-sharing",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "shareSamples": {
+                    "type": "boolean"
+                  },
+                  "minConfidence": {
+                    "type": "number",
+                    "minimum": 0.5,
+                    "maximum": 0.99
+                  },
+                  "apiKey": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "model",
+                  "shareSamples",
+                  "minConfidence"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/ai/key": {
+      "delete": {
+        "summary": "Remove the saved key",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. "
+      }
+    },
+    "/api/settings/ai/test": {
+      "post": {
+        "summary": "Make a tiny real mapping request to verify key and model (before or after saving)",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string"
+                  },
+                  "apiKey": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/settings/ai/models": {
+      "get": {
+        "summary": "Free models currently offered by OpenRouter",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. "
+      }
+    },
+    "/api/settings/escalation": {
+      "put": {
+        "summary": "Set or clear the Slack-compatible escalation webhook ('' clears)",
+        "tags": [
+          "Settings"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "webhookUrl": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "webhookUrl"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/sources/preview": {
+      "post": {
+        "summary": "Parse files and return sheets, row counts, columns and samples without creating anything",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs": {
+      "get": {
+        "summary": "Migrations you may see (admins: all; consultants: assigned)",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        }
+      },
+      "post": {
+        "summary": "Create a migration and start the agent (Generate)",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "202": {
+            "description": "Accepted; poll GET /api/runs/{id}"
+          },
+          "400": {
+            "description": "Unreadable file or invalid schema/destination"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string"
+                  },
+                  "assignedTo": {
+                    "type": "string",
+                    "description": "Consultant user id who receives escalations"
+                  },
+                  "configuration": {
+                    "type": "string",
+                    "description": "JSON: {schema, identityField, destination:{kind:'reference'}|{kind:'http',url}}. Omit for the Employee preset + built-in mock API."
+                  },
+                  "authorization": {
+                    "type": "string",
+                    "description": "Optional Authorization header for an http destination; stored encrypted."
+                  },
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    }
+                  }
+                },
+                "required": [
+                  "name",
+                  "assignedTo",
+                  "files"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/runs/{id}": {
+      "get": {
+        "summary": "Full migration state: mappings, records, review cases, escalation, audit events",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/summary": {
+      "get": {
+        "summary": "Counts, AI usage and current escalation",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/audit": {
+      "get": {
+        "summary": "Download the audit export",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/payload": {
+      "get": {
+        "summary": "The exact JSON records that will be / were delivered (blocked while cases are open)",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/export": {
+      "get": {
+        "summary": "Cleaned records as CSV",
+        "tags": [
+          "Migrations"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/resolve": {
+      "post": {
+        "summary": "Approve, correct, ignore or reject a review case",
+        "tags": [
+          "Review"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Resolving the last case starts delivery automatically.",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "caseId": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer",
+                    "description": "run.revision you last read; stale values get 409"
+                  },
+                  "decision": {
+                    "type": "object",
+                    "properties": {
+                      "action": {
+                        "type": "string",
+                        "enum": [
+                          "approve",
+                          "correct",
+                          "ignore",
+                          "reject"
+                        ]
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "reason": {
+                        "type": "string",
+                        "minLength": 8
+                      }
+                    },
+                    "required": [
+                      "action",
+                      "reason"
+                    ]
+                  }
+                },
+                "required": [
+                  "caseId",
+                  "expectedRevision",
+                  "decision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/assign": {
+      "post": {
+        "summary": "Reassign escalations to another consultant",
+        "tags": [
+          "Review"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "assignedTo": {
+                    "type": "string"
+                  },
+                  "expectedRevision": {
+                    "type": "integer"
+                  }
+                },
+                "required": [
+                  "assignedTo",
+                  "expectedRevision"
+                ]
+              }
+            }
+          }
+        },
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/retry": {
+      "post": {
+        "summary": "Retry outstanding (failed or unsent) records",
+        "tags": [
+          "Recovery"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. Same idempotency key per record, so retries never duplicate writes.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/resume": {
+      "post": {
+        "summary": "Resume a migration interrupted by a server restart",
+        "tags": [
+          "Recovery"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/runs/{id}/rollback": {
+      "post": {
+        "summary": "Compare-before-restore rollback (built-in mock API only)",
+        "tags": [
+          "Recovery"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. Refuses records changed by a later migration.",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ]
+      }
+    },
+    "/api/mock/records": {
+      "get": {
+        "summary": "Records currently held by the built-in mock API",
+        "tags": [
+          "Mock target"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. "
+      },
+      "post": {
+        "summary": "Built-in mock target: accept one record (used by the migration service)",
+        "tags": [
+          "Mock target"
+        ],
+        "description": "Requires the internal service credential and an Idempotency-Key of the form <runId>:<recordId>. Only records of a run that is currently delivering, with exactly the approved payload, are accepted.",
+        "security": [
+          {
+            "service": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Written (or idempotent replay)"
+          },
+          "403": {
+            "description": "Not the migration service"
+          },
+          "409": {
+            "description": "No authorized delivery"
+          },
+          "503": {
+            "description": "Simulated outage (see fail-next)"
+          }
+        }
+      }
+    },
+    "/api/mock/fail-next": {
+      "post": {
+        "summary": "Make the next N writes to the built-in mock API fail with 503 (to demonstrate escalation and retry)",
+        "tags": [
+          "Mock target"
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          },
+          "401": {
+            "description": "Not signed in"
+          }
+        },
+        "description": "Administrator only. ",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "count": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 10
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

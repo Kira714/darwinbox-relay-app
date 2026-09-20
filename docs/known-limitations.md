@@ -1,0 +1,12 @@
+# Scope and known limitations
+
+- **Prototype scope.** One Node process, one SQLite file, one workspace, mock target. Not deployed, not a live Darwinbox integration, not production-hardened.
+- **AI.** Free OpenRouter models are rate-limited, vary between runs and can be slow (a two-file migration took roughly 20–40 s to map). The client retries and falls back to `openrouter/free`; if that fails the agent degrades to aliases-only and escalates. Model confidence is self-reported and uncalibrated; the threshold is a tunable dial, not a measured error rate. Verified with `nvidia/nemotron-3-super-120b-a12b:free`; other models are untested. Free providers may log prompts — hence shape-only defaults.
+- **Schema support.** Flat JSON Schema subset (string/number/integer/boolean, required, email/date formats, enum, pattern, bounds). No nested objects/arrays, cross-field rules or lookups.
+- **Targets.** Arbitrary HTTP targets support retry only; rollback exists for the built-in mock API. A real system needs a verified idempotency and undo contract. Requests go from the server, so the endpoint must be reachable from it; cloud-metadata hosts are blocked, private/loopback hosts are allowed (needed for local mocks).
+- **Accounts.** Admin and consultant roles, assigned-run access, sessions, CSRF, throttling and password change exist. No SSO/MFA, invitations, password recovery or user-management UI. Two accounts are seeded with random passwords.
+- **Data at rest.** SQLite holds source data, decisions and target snapshots in plaintext (only secrets are encrypted). No retention/deletion workflow or tenant isolation.
+- **Concurrency.** Revision checks protect decisions; in-process locks protect workflows. No durable queue, distributed locks or horizontal scaling. A restart marks in-flight runs as interrupted for an admin to resume.
+- **Ingestion.** UTF-8 CSV and `.xlsx`, bounded by file/row/cell size; formulas are refused. Parsing happens in-process without sandboxing. Fixed limits: 10 files, 2 MB each, 5,000 rows.
+- **Audit.** Persisted, insert-only within the application; not tamper-proof against someone with database access.
+- **Tests.** 44 automated tests plus a Chromium end-to-end run with a stubbed model. One manual live run against real OpenRouter with real Excel files was performed during development; automated tests do not call the network. Not a penetration test or accessibility certification.
