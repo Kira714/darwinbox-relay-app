@@ -1,0 +1,5 @@
+employee_id,Employee Name,Email Address,Team,Job Title,Hire Date,Employment Status
+MR-001,Ananya Rao,ananya.rao@example.com,Engineering,Software Engineer,2024-01-15,active
+MR-003,Meera Iyer,meera.iyer@example.com,People,People Partner,2023-08-21,active
+MR-007,Nora Evans,nora.evans@example.com,Customer Success,Customer Success Manager,2024-04-22,active
+MR-008,Vikram Das,vikram.das@example.com,Engineering,QA Engineer,2024-05-13,active

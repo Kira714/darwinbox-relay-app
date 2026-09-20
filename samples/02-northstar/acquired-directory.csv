@@ -1,0 +1,4 @@
+employee_id,Employee Name,Email Address,Team,Job Title,Hire Date,Employment Status
+NS-001,Rhea Malhotra,rhea.malhotra@example.com,Engineering,Engineering Manager,2022-10-17,active
+NS-003,Tara Bose,tara.bose@example.com,Operations,People Operations Lead,2023-03-20,active
+NS-006,Sanjay Menon,sanjay.menon@example.com,Sales,Regional Sales Manager,2023-09-11,active
